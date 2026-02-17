@@ -1,4 +1,5 @@
-<img width="899" height="752" alt="image" src="https://github.com/user-attachments/assets/9f366712-bd10-4c69-b747-8fa11cbee218" />
+<img width="977" height="823" alt="image" src="https://github.com/user-attachments/assets/64af2808-be45-4d15-91bd-58d36c95f615" />
+
 
 Official source:
 https://huggingface.co/Camais03/camie-tagger-v2
