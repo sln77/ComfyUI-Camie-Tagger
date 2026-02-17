@@ -1,5 +1,3 @@
-# D:\ComfyUI_windows_portable\ComfyUI\custom_nodes\camie-tagger\camie_tagger.py
-
 import os
 import json
 import onnxruntime as ort
@@ -15,7 +13,7 @@ class CamieTaggerNode:
         self.cached_onnx_path = ""
         self.cached_metadata_path = ""
 
-    CATEGORIES = sorted(['character', 'general', 'meta', 'series'])
+    CATEGORIES = sorted(['character', 'general', 'meta', 'copyright', 'artist', 'year', 'rating'])
     
     RETURN_TYPES = ("STRING",) + tuple("STRING" for _ in CATEGORIES)
     RETURN_NAMES = ("all_tags",) + tuple(cat + "_tags" for cat in CATEGORIES)
@@ -92,13 +90,9 @@ class CamieTaggerNode:
             tag = tag.strip().lower()
             if not tag:
                 continue
-            
-            
             if replace_underscores:
                 tag = tag.replace(' ', '_')
-            
             excluded.add(tag)
-        # ---------------------------
 
         tags_by_category = {cat: [] for cat in self.CATEGORIES}
         
@@ -110,11 +104,11 @@ class CamieTaggerNode:
                     continue
                 
                 category = tag_to_category.get(tag_name, "general")
-                if category not in tags_by_category:
-                    category = "general" 
-
+                
                 if category in tags_by_category:
                     tags_by_category[category].append((tag_name, prob))
+                else:
+                    tags_by_category["general"].append((tag_name, prob))
 
         output_tags = {}
         all_tags_list = []
