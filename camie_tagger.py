@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 
 class CamieTaggerNode:
-
+    
     def __init__(self):
         self.loaded_model = None
         self.loaded_metadata = None
@@ -14,6 +14,7 @@ class CamieTaggerNode:
         self.cached_metadata_path = ""
 
     CATEGORIES = sorted(['character', 'general', 'meta', 'series'])
+    
     RETURN_TYPES = ("STRING",) + tuple("STRING" for _ in CATEGORIES)
     RETURN_NAMES = ("all_tags",) + tuple(cat + "_tags" for cat in CATEGORIES)
 
@@ -77,7 +78,7 @@ class CamieTaggerNode:
         tags = [tag for tag, idx in sorted(tag_mapping['tag_to_idx'].items(), key=lambda item: item[1])]
         tag_to_category = tag_mapping['tag_to_category']
         
-        excluded = {tag.strip().lower() for tag in exclude_tags.split(',') if tag.strip()}
+        excluded = {tag.strip().lower().replace(' ', '_') for tag in exclude_tags.split(',') if tag.strip()}
         
         tags_by_category = {cat: [] for cat in self.CATEGORIES}
         
@@ -86,6 +87,7 @@ class CamieTaggerNode:
                 tag_name = tags[i]
                 if tag_name.lower() in excluded:
                     continue
+                
                 category = tag_to_category.get(tag_name, "unknown")
                 if category in tags_by_category:
                     tags_by_category[category].append((tag_name, prob))
