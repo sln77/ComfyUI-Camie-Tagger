@@ -1,3 +1,5 @@
+# D:\ComfyUI_windows_portable\ComfyUI\custom_nodes\camie-tagger\camie_tagger.py
+
 import os
 import json
 import onnxruntime as ort
@@ -51,11 +53,9 @@ class CamieTaggerNode:
         if not os.path.exists(metadata_path):
             raise FileNotFoundError(f"Metadata JSON file not found at: {metadata_path}")
 
-        print(f"CamieTagger: Loading ONNX model from {onnx_path}")
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         self.loaded_model = ort.InferenceSession(onnx_path, providers=providers)
         
-        print(f"CamieTagger: Loading metadata from {metadata_path}")
         with open(metadata_path, 'r', encoding='utf-8') as f:
             self.loaded_metadata = json.load(f)
             
@@ -72,23 +72,47 @@ class CamieTaggerNode:
 
         input_name = self.loaded_model.get_inputs()[0].name
         output_name = self.loaded_model.get_outputs()[0].name
-        probs = self.loaded_model.run([output_name], {input_name: processed_image})[0][0]
+        
+        logits = self.loaded_model.run([output_name], {input_name: processed_image})[0][0]
+        probs = 1 / (1 + np.exp(-logits)) # Sigmoid
 
-        tag_mapping = self.loaded_metadata['dataset_info']['tag_mapping']
-        tags = [tag for tag, idx in sorted(tag_mapping['tag_to_idx'].items(), key=lambda item: item[1])]
-        tag_to_category = tag_mapping['tag_to_category']
+        dataset_info = self.loaded_metadata['dataset_info']
+        tag_mapping = dataset_info['tag_mapping']
         
-        excluded = {tag.strip().lower().replace(' ', '_') for tag in exclude_tags.split(',') if tag.strip()}
+        if 'idx_to_tag' in tag_mapping:
+            idx_map = {int(k): v for k, v in tag_mapping['idx_to_tag'].items()}
+            tags = [idx_map[i] for i in range(len(idx_map))]
+        else:
+            tags = [tag for tag, idx in sorted(tag_mapping['tag_to_idx'].items(), key=lambda item: item[1])]
+
+        tag_to_category = tag_mapping.get('tag_to_category', {})
         
+        excluded = set()
+        for tag in exclude_tags.split(','):
+            tag = tag.strip().lower()
+            if not tag:
+                continue
+            
+            
+            if replace_underscores:
+                tag = tag.replace(' ', '_')
+            
+            excluded.add(tag)
+        # ---------------------------
+
         tags_by_category = {cat: [] for cat in self.CATEGORIES}
         
         for i, prob in enumerate(probs):
             if prob > threshold:
                 tag_name = tags[i]
+                
                 if tag_name.lower() in excluded:
                     continue
                 
-                category = tag_to_category.get(tag_name, "unknown")
+                category = tag_to_category.get(tag_name, "general")
+                if category not in tags_by_category:
+                    category = "general" 
+
                 if category in tags_by_category:
                     tags_by_category[category].append((tag_name, prob))
 
@@ -122,6 +146,13 @@ class CamieTaggerNode:
     def preprocess(self, image: Image.Image, img_size: int) -> np.ndarray:
         image = image.resize((img_size, img_size), Image.LANCZOS)
         image_np = np.array(image).astype(np.float32) / 255.0
+        
+        # ImageNet Normalization
+        mean = np.array([0.485, 0.456, 0.406]).astype(np.float32)
+        std = np.array([0.229, 0.224, 0.225]).astype(np.float32)
+        
+        image_np = (image_np - mean) / std
+        
         image_np = np.transpose(image_np, (2, 0, 1))
         image_np = np.expand_dims(image_np, axis=0)
         return image_np
